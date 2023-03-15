@@ -59,7 +59,7 @@ impl PerfectHashingDataStructure {
         let hash: usize = self.hash_function.hash(elem);
         println!("insert elem: {}", elem);
         println!("hash index: {}", hash);
-        self.vec.insert(hash, self.vec[hash] + 1);
+        self.vec[hash] += 1;
     }
 
     fn query(&mut self, elem: u32) -> u32 {
@@ -83,13 +83,13 @@ fn make_random_hash_function(hash_len: u32) -> SeededHash {
 
 fn perfect_hashing(input_array: &Vec<u32>) -> PerfectHashingDataStructure {
     let input_len: usize = input_array.len();
-    let hash_len = log2u(input_len.pow(2));
+    let hash_len = log2u(2*input_len.pow(2)) - 1;
     let hash: SeededHash = make_random_hash_function(hash_len);
 
     let mut vec: Vec<u32> = vec![0; 2*input_len.pow(2)];
 
     let mut ph_data_structure = PerfectHashingDataStructure {
-        vec, // Vec::with_capacity(input_len),
+        vec,
         hash_function: hash,
     };
 
@@ -104,16 +104,11 @@ fn log2u(x: usize) -> u32 {
 }
 
 fn main() {
-    const INPUT_SIZE: usize = 2_i32.pow(10) as usize - 1;
+    const INPUT_SIZE: usize = 2_i32.pow(16) as usize;
     let mut input: Vec<u32> = Vec::with_capacity(INPUT_SIZE);
     for i in 0..INPUT_SIZE {
         input.push(i as u32);
     }
-
-    // let ij: u32 = 2666;
-    // let hash = make_random_hash_function(20);
-    // println!("{}", hash.hash(ij));
-    // println!("{}", hash.hash(ij));
 
     let mut ph_struct: PerfectHashingDataStructure = perfect_hashing(&input);
 
@@ -124,4 +119,7 @@ fn main() {
         sum = sum+s;
     }
     println!("{}", sum);
+    if sum != INPUT_SIZE {
+        println!("There where {} collisions!", sum - INPUT_SIZE);
+    }
 }
