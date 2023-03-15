@@ -57,13 +57,10 @@ struct PerfectHashingDataStructure {
 impl PerfectHashingDataStructure {
     fn insert(&mut self, elem: u32) {
         let hash: usize = self.hash_function.hash(elem);
-        println!("insert elem: {}", elem);
-        println!("hash index: {}", hash);
         self.vec[hash] += 1;
     }
 
     fn query(&mut self, elem: u32) -> u32 {
-        println!("query elem: {}", elem);
         let hash: usize = self.hash_function.hash(elem);
         return self.vec[hash];
     }
@@ -114,11 +111,10 @@ fn main() {
     let mut sum: usize = 0;
     for i in 0..INPUT_SIZE {
         let s = ph_struct.query(i as u32) as usize;
-        println!("{}", s);
         sum = sum+s;
     }
     println!("{}", sum);
     if sum != INPUT_SIZE {
-        println!("There where {} collisions!", sum - INPUT_SIZE);
+        println!("There where collisions!");
     }
 }
