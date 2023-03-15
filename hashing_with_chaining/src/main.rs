@@ -1,3 +1,5 @@
+use std::collections::LinkedList;
+use std::ops::{Deref, Index};
 use rand::prelude::*;
 use rbtree::RBTree;
 
@@ -30,6 +32,60 @@ fn make_random_hash_function(hash_len: u32) -> SeededHash {
         a,
         b,
     };
+}
+
+struct HwCDataStructure<> {
+    vec: Vec<LinkedList<u32>>,
+    hash_function: SeededHash,
+}
+
+impl HwCDataStructure<> {
+    fn insert(&mut self, elem: u32) {
+        let hash: usize = self.hash_function.hash(elem);
+
+        if let Some(found_list) = self.vec.get_mut(hash) {
+            (*found_list).push_front(elem);
+            self.vec[hash] = *found_list;
+        }
+        // let found_list = match found_list_opt {
+        //     Some(x) => x,
+        //     None => LinkedList::new(),
+        // };
+        // found_list.push(elem);
+
+
+
+
+    }
+
+    fn query(&mut self, elem: u32) -> bool {
+        let hash: usize = self.hash_function.hash(elem);
+
+        return self.vec[hash].contains(&elem);
+    }
+}
+
+fn hashing_with_chaining(input_array: &Vec<u32>) -> HwCDataStructure {
+    let input_len: usize = input_array.len();
+    let hash_len: u32 = log2u(2*input_len.pow(2)) - 1;
+    let hash: SeededHash = make_random_hash_function(hash_len);
+
+    let mut vec: Vec<LinkedList<u32>> = Vec::with_capacity(2*input_len.pow((2))); // vec![LinkedList; 2*input_len.pow(2)];
+    for i in 0..input_len {
+        let list: LinkedList<u32> = LinkedList::new();
+        vec[i] = list
+    }
+
+    let mut hwc_struct: HwCDataStructure = HwCDataStructure {
+        vec,
+        hash_function: hash,
+    };
+
+    for x in input_array {
+        hwc_struct.insert(*x);
+    }
+
+    return hwc_struct;
 }
 
 // struct HwCDataStructure {
@@ -119,10 +175,22 @@ fn make_rb_tree(input: &Vec<u32>) -> RBTree<u32, u32> {
     return tree;
 }
 
-fn main() {
-    const INPUT_SIZE: usize = 2_i32.pow(16) as usize;
-    let input: Vec<u32> = Vec::from_iter(0..INPUT_SIZE as u32);
 
+
+fn test_hashing_with_chaining() {
+    const INPUT_SIZE: usize = 2_i32.pow(16) as usize;
+    let mut input: Vec<u32> = Vec::with_capacity(INPUT_SIZE);
+
+    for i in 0..INPUT_SIZE {
+        input.push(i as u32);
+    }
+
+    let mut hwc_struct: HwCDataStructure = hashing_with_chaining(&input);
+}
+
+fn main() {
+    // test_perfect_hashing();
+    test_hashing_with_chaining();
     perfect_hashing(&input);
     rb_tree(&input);
 }
