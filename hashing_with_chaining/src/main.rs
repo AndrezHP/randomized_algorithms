@@ -4,9 +4,7 @@ use rand::prelude::*;
 
 pub fn random_generator(from: u32, to: u32) -> u32 {
     let mut rng = thread_rng();
-    let y: u32 = rng.gen_range(from..to);
-    println!("Some random number: {}", y);
-    return y;
+    return rng.gen_range(from..to);
 }
 
 // TODO: implement this
@@ -37,13 +35,12 @@ struct HwCDataStructure {
     vec: Vec<Vec<u32>>,
     hash_function: SeededHash,
 }
-//
+
 // impl HwCDataStructure {
 //     fn insert(&mut self, elem: u32) {
 //         let hash: usize = self.hash_function(elem);
 //         let mut found_array: Vec<u32> = self.vec.get(hash);
 //     }
-//
 //     fn query(&mut self, elem: u32) -> bool {
 //         return false;
 //     }
@@ -59,7 +56,6 @@ impl PerfectHashingDataStructure {
         let hash: usize = self.hash_function.hash(elem);
         self.vec[hash] += 1;
     }
-
     fn query(&mut self, elem: u32) -> u32 {
         let hash: usize = self.hash_function.hash(elem);
         return self.vec[hash];
