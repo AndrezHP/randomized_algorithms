@@ -83,7 +83,7 @@ fn perfect_hashing(input_array: &Vec<u32>) -> PerfectHashingDataStructure {
     let hash_len = log2u(input_len.pow(2));
     let hash: SeededHash = make_random_hash_function(hash_len);
 
-    let mut vec: Vec<u32> = vec![0; input_len.pow(2)];
+    let vec: Vec<u32> = vec![0; input_len.pow(2)];
     let mut ph_data_structure = PerfectHashingDataStructure {
         vec,
         hash_function: hash,
@@ -101,10 +101,7 @@ fn log2u(x: usize) -> u32 {
 
 fn main() {
     const INPUT_SIZE: usize = 2_i32.pow(16) as usize;
-    let mut input: Vec<u32> = Vec::with_capacity(INPUT_SIZE);
-    for i in 0..INPUT_SIZE {
-        input.push(i as u32);
-    }
+    let input: Vec<u32> = Vec::from_iter(0..INPUT_SIZE as u32);
 
     let mut ph_struct: PerfectHashingDataStructure = perfect_hashing(&input);
 
