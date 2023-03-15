@@ -83,11 +83,10 @@ fn make_random_hash_function(hash_len: u32) -> SeededHash {
 
 fn perfect_hashing(input_array: &Vec<u32>) -> PerfectHashingDataStructure {
     let input_len: usize = input_array.len();
-    let hash_len = log2u(2*input_len.pow(2)) - 1;
+    let hash_len = log2u(input_len.pow(2));
     let hash: SeededHash = make_random_hash_function(hash_len);
 
-    let mut vec: Vec<u32> = vec![0; 2*input_len.pow(2)];
-
+    let mut vec: Vec<u32> = vec![0; input_len.pow(2)];
     let mut ph_data_structure = PerfectHashingDataStructure {
         vec,
         hash_function: hash,
@@ -100,7 +99,7 @@ fn perfect_hashing(input_array: &Vec<u32>) -> PerfectHashingDataStructure {
 }
 
 fn log2u(x: usize) -> u32 {
-    x.ilog2() + 1
+    x.ilog2()
 }
 
 fn main() {
