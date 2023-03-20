@@ -20,31 +20,17 @@ impl SeededHash {
         let randomness_size: u32 = base.pow(31);
         let rand_a: u32 = random_generator(1, randomness_size);
         let rand_b: u32 = random_generator(1, randomness_size);
-
         return SeededHash {
             a: rand_a,
             b: rand_b,
             l: hash_len
         }
     }
-
     // Multiply shift hashing as from lecture notes (https://arxiv.org/pdf/1504.06804.pdf) at 3.3
     fn hash(&self, x: u32) -> usize {
         let multiply_add: u32 = self.a.wrapping_mul(x).wrapping_add(self.b);
         return multiply_add.wrapping_shr(32 - self.l) as usize;
     }
-}
-
-fn make_random_hash_function(hash_len: u32) -> SeededHash {
-    let base: u32 = 2;
-    let randomness_size: u32 = base.pow(31);
-    let a: u32 = random_generator(1, randomness_size);
-    let b: u32 = random_generator(1, randomness_size);
-    return SeededHash {
-        l: hash_len,
-        a,
-        b,
-    };
 }
 
 #[derive(Clone, PartialEq)]
