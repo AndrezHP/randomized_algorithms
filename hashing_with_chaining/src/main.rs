@@ -7,7 +7,9 @@ pub fn random_generator(from: u32, to: u32) -> u32 {
     return rng.gen_range(from..to);
 }
 
-#[derive(Clone, PartialEq)]
+// The hash function is c-universal
+const C: usize = 2;
+
 struct SeededHash {
     l: u32,
     a: u32,
@@ -33,18 +35,16 @@ impl SeededHash {
     }
 }
 
-#[derive(Clone, PartialEq)]
 struct HwC {
     vec: Vec<LinkedList<u32>>,
     hash_function: SeededHash
 }
 
 impl<'a> HwC {
-    fn new(input_array: &Vec<u32>) -> HwC {
-        let input_len: usize = 4*input_array.len();
+    fn new(size: usize) -> HwC {
+        let input_len: usize = 4*C*size;
         let hash_len: u32 = log2u(input_len);
-        let mut vec = vec![LinkedList::<u32>::new(); input_len];
-
+        let vec = vec![LinkedList::<u32>::new(); input_len];
         let hash_fn: SeededHash = SeededHash::new(hash_len);
         return HwC {
             vec,
@@ -62,7 +62,7 @@ impl<'a> HwC {
 }
 
 fn hashing_with_chaining(input: &Vec<u32>) {
-    let mut hwc: HwC = HwC::new(&input);
+    let mut hwc: HwC = HwC::new(input.len());
     for x in input {
         hwc.insert(*x);
     }
@@ -75,28 +75,96 @@ fn hashing_with_chaining(input: &Vec<u32>) {
     println!("{}", sum);
 }
 
+struct Bucket {
+    vec: Vec<u32>,
+    hash_function: SeededHash,
+}
+
+impl Bucket {
+    fn new(input_array: &Vec<u32>) -> Bucket {
+        let array_len: usize = 2*C*input_array.len().pow(2);
+        if array_len == 0 {
+            return Bucket {
+                vec: vec![0; 0],
+                hash_function: SeededHash::new(0)
+            }
+        }
+        let hash_len: u32 = log2u(array_len);
+        let arr = vec![0; array_len];
+        let mut bucket: Bucket = Bucket {
+            vec: arr,
+            hash_function: SeededHash::new(hash_len),
+        };
+        for x in input_array {
+            let success: bool = bucket.insert(*x);
+            if !success {
+                return Bucket::new(input_array)
+            }
+        }
+        return bucket;
+    }
+    fn insert(&mut self, elem: u32) -> bool {
+        if self.vec[self.hash_function.hash(elem)] != 0 {
+            return false;
+        } else {
+            self.vec[self.hash_function.hash(elem)] = elem;
+            return true;
+        }
+    }
+    fn query(&self, elem: u32) -> bool {
+        return self.vec[self.hash_function.hash(elem)] == elem
+    }
+}
+
 struct PerfectHashing {
-    vec: Vec<HwC>,
+    vec: Vec<Bucket>,
     hash_function: SeededHash,
 }
 
 impl PerfectHashing {
     fn new(input_array: &Vec<u32>) -> PerfectHashing {
-        let input_len: usize = 4*input_array.len();
-        let hash_len: u32 = log2u(input_len);
-        let mut vec = vec![HwC::new(&input_array); input_len];
+        let array_len: usize = 4*C*input_array.len();
 
+        let hash_len: u32 = log2u(array_len);
         let hash_fn: SeededHash = SeededHash::new(hash_len);
 
+        let mut buckets: Vec<Vec<u32>> = Vec::new();
+        for _ in 0..array_len {
+            buckets.push(Vec::new());
+        }
+
+        for x in input_array {
+            let hash = hash_fn.hash(*x);
+            buckets[hash].push(*x);
+        }
+
+        let mut sum_of_squares = 0;
+        for x in &mut buckets {
+            sum_of_squares += x.len().pow(2);
+        }
+        if sum_of_squares > array_len {
+            println!("Fail");
+            return PerfectHashing::new(input_array);
+        }
+
+        let mut vec = Vec::<Bucket>::with_capacity(array_len);
+        for vec_bucket in &mut buckets {
+            if vec_bucket.len() == 0 {
+                vec.push(Bucket::new(&Vec::new()));
+                continue
+            }
+            let bucket = Bucket::new(vec_bucket);
+            vec.push(bucket);
+        }
         return PerfectHashing {
             vec,
             hash_function: hash_fn
         }
     }
-    fn insert(&mut self, elem: u32) {
-        let hash: usize = self.hash_function.hash(elem);
-        self.vec[hash].insert(elem);
-    }
+    // fn insert(&mut self, elem: u32) {
+    //     let hash: usize = self.hash_function.hash(elem);
+    //     self.vec[hash].insert(elem);
+    // }
     fn query(&self, elem: u32) -> bool {
         let hash: usize = self.hash_function.hash(elem);
         return self.vec[hash].query(elem);
@@ -104,10 +172,7 @@ impl PerfectHashing {
 }
 
 fn perfect_hashing(input: &Vec<u32>) {
-    let mut ph_struct: PerfectHashing = PerfectHashing::new(&input);
-    for x in input {
-        ph_struct.insert(*x);
-    }
+    let ph_struct: PerfectHashing = PerfectHashing::new(&input);
 
     let mut sum: usize = 0;
     for x in input {
@@ -141,8 +206,9 @@ fn make_rb_tree(input: &Vec<u32>) -> RBTree<u32, u32> {
 }
 
 fn main() {
-    const INPUT_SIZE: usize = 2_i32.pow(12) as usize;
-    let input: Vec<u32> = Vec::from_iter(0..INPUT_SIZE as u32);
+    const BIT_SIZE: u32 = 10;
+    const INPUT_SIZE: usize = 2_i32.pow(BIT_SIZE) as usize;
+    let input: Vec<u32> = Vec::from_iter(1..(INPUT_SIZE+1) as u32);
     hashing_with_chaining(&input);
     perfect_hashing(&input);
     rb_tree(&input);
