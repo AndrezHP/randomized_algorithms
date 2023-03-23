@@ -1,6 +1,10 @@
 use std::collections::LinkedList;
 use rand::prelude::*;
 use rbtree::RBTree;
+use time::OffsetDateTime;
+use std::fs::File;
+use std::fs::OpenOptions;
+use std::io::prelude::*;
 
 pub fn random_generator(from: u32, to: u32) -> u32 {
     let mut rng = thread_rng();
@@ -40,9 +44,9 @@ struct HwC {
     hash_function: SeededHash
 }
 
-impl<'a> HwC {
+impl HwC {
     fn new(size: usize) -> HwC {
-        let input_len: usize = 4*C*size;
+        let input_len: usize = size;
         let hash_len: u32 = log2u(input_len);
         let vec = vec![LinkedList::<u32>::new(); input_len];
         let hash_fn: SeededHash = SeededHash::new(hash_len);
@@ -59,20 +63,6 @@ impl<'a> HwC {
         let hash_val: usize = self.hash_function.hash(elem);
         self.vec[hash_val].contains(&elem)
     }
-}
-
-fn hashing_with_chaining(input: &Vec<u32>) {
-    let mut hwc: HwC = HwC::new(input.len());
-    for x in input {
-        hwc.insert(*x);
-    }
-    let mut sum: usize = 0;
-    for x in input {
-        if hwc.query(*x) {
-            sum += 1;
-        }
-    }
-    println!("{}", sum);
 }
 
 struct Bucket {
@@ -104,11 +94,11 @@ impl Bucket {
         return bucket;
     }
     fn insert(&mut self, elem: u32) -> bool {
-        if self.vec[self.hash_function.hash(elem)] != 0 {
-            return false;
+        return if self.vec[self.hash_function.hash(elem)] != 0 {
+            false
         } else {
             self.vec[self.hash_function.hash(elem)] = elem;
-            return true;
+            true
         }
     }
     fn query(&self, elem: u32) -> bool {
@@ -171,30 +161,8 @@ impl PerfectHashing {
     }
 }
 
-fn perfect_hashing(input: &Vec<u32>) {
-    let ph_struct: PerfectHashing = PerfectHashing::new(&input);
-
-    let mut sum: usize = 0;
-    for x in input {
-        let s = ph_struct.query(*x) as usize;
-        sum = sum+s;
-    }
-    println!("{}", sum);
-}
-
 fn log2u(x: usize) -> u32 {
     x.ilog2()
-}
-
-fn rb_tree(input: &Vec<u32>) {
-    let tree = make_rb_tree(input);
-    let mut sum: usize = 0;
-    for x in input {
-        if tree.contains_key(x) {
-            sum += 1;
-        }
-    }
-    println!("{}", sum);
 }
 
 fn make_rb_tree(input: &Vec<u32>) -> RBTree<u32, u32> {
@@ -205,11 +173,119 @@ fn make_rb_tree(input: &Vec<u32>) -> RBTree<u32, u32> {
     return tree;
 }
 
-fn main() {
-    const BIT_SIZE: u32 = 10;
-    const INPUT_SIZE: usize = 2_i32.pow(BIT_SIZE) as usize;
-    let input: Vec<u32> = Vec::from_iter(1..(INPUT_SIZE+1) as u32);
-    hashing_with_chaining(&input);
-    perfect_hashing(&input);
-    rb_tree(&input);
+fn rb_tree(input: &Vec<u32>, file: &mut File) {
+    let c_start = OffsetDateTime::now_utc();
+    let tree = make_rb_tree(input);
+    let c_stop = OffsetDateTime::now_utc();
+    writeln!(file, "Construction time: {}", c_stop - c_start).expect("Cannot write to file");
+
+    let mut sum: usize = 0;
+
+    let q_start = OffsetDateTime::now_utc();
+    for x in input {
+        if tree.contains_key(x) {
+            sum += 1;
+        }
+    }
+    let q_stop = OffsetDateTime::now_utc();
+    writeln!(file, "Query time: {}", q_stop - q_start).expect("Cannot write to file");
+
+    println!("{}", sum);
+}
+
+fn hashing_with_chaining(input: &Vec<u32>, file: &mut File) {
+    let c_start = OffsetDateTime::now_utc();
+    let mut hwc: HwC = HwC::new(input.len());
+    for x in input {
+        hwc.insert(*x);
+    }
+    let c_stop = OffsetDateTime::now_utc();
+    writeln!(file, "Construction time: {}", c_stop - c_start).expect("Cannot write to file");
+
+
+    let mut sum: usize = 0;
+    let q_start = OffsetDateTime::now_utc();
+    for x in input {
+        if hwc.query(*x) {
+            sum += 1;
+        }
+    }
+    println!("{}", sum);
+    let q_stop = OffsetDateTime::now_utc();
+    writeln!(file, "Query time: {}", q_stop - q_start).expect("Cannot write to file");
+
+    let mut longest_ll: usize = 0;
+    for ll in hwc.vec {
+        if ll.len() > longest_ll {
+            longest_ll = ll.len();
+        }
+    }
+    writeln!(file, "Longest linked list: {}", longest_ll).expect("Cannot write to file");
+}
+
+fn perfect_hashing(input: &Vec<u32>, file: &mut File) {
+    let c_start = OffsetDateTime::now_utc();
+    let ph_struct: PerfectHashing = PerfectHashing::new(&input);
+    let c_stop = OffsetDateTime::now_utc();
+    writeln!(file, "Construction time: {}", c_stop - c_start).expect("Cannot write to file");
+
+
+    let q_start = OffsetDateTime::now_utc();
+    let mut sum: usize = 0;
+    for x in input {
+        let s = ph_struct.query(*x) as usize;
+        sum = sum+s;
+    }
+    let q_stop = OffsetDateTime::now_utc();
+    writeln!(file, "Query time: {}", q_stop - q_start).expect("Cannot write to file");
+}
+
+fn make_writable_file(file_name: &str) -> File {
+    return OpenOptions::new()
+        .write(true)
+        .append(true)
+        .open(file_name.to_owned() + ".txt")
+        .unwrap();
+}
+
+fn benchmark_rb_tree(test_sizes: [i32; 7]) {
+    let mut file: File = make_writable_file("rb_tree");
+
+    for test_size in test_sizes {
+        writeln!(file, "Test size: {}", test_size).expect("Cannot write to file");
+        let input_size: usize = 2_i32.pow(test_size as u32) as usize;
+        let input: Vec<u32> = Vec::from_iter(1..(input_size +1) as u32);
+        rb_tree(&input, &mut file);
+    }
+}
+
+fn benchmark_hwc(test_sizes: [i32; 7]) {
+    let mut file: File = make_writable_file("hwc");
+
+    for test_size in test_sizes {
+        writeln!(file, "Test size: {}", test_size).expect("Cannot write to file");
+        let input_size: usize = 2_i32.pow(test_size as u32) as usize;
+        let input: Vec<u32> = Vec::from_iter(1..(input_size +1) as u32);
+        hashing_with_chaining(&input, &mut file);
+    }
+}
+
+fn benchmark_ph(test_sizes: [i32; 7]) {
+    let mut file: File = make_writable_file("ph");
+
+    for test_size in test_sizes {
+        writeln!(file, "Test size: {}", test_size).expect("Cannot write to file");
+        let input_size: usize = 2_i32.pow(test_size as u32) as usize;
+        let input: Vec<u32> = Vec::from_iter(1..(input_size +1) as u32);
+        perfect_hashing(&input, &mut file);
+    }
+}
+
+
+fn main() -> std::io::Result<()> {
+    const TEST_SIZES: [i32; 7] = [12, 14, 16, 18, 20, 22, 24];
+    benchmark_rb_tree(TEST_SIZES);
+    benchmark_hwc(TEST_SIZES);
+    benchmark_ph(TEST_SIZES);
+    Ok(())
 }
