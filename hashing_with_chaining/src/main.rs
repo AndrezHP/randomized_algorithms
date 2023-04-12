@@ -14,6 +14,11 @@ pub fn random_generator(from: u32, to: u32) -> u32 {
 // The hash function is c-universal
 const C: usize = 2;
 
+struct KeyValuePair {
+    key: u32,
+    value: u32,
+}
+
 struct SeededHash {
     l: u32,
     a: u32,
@@ -40,7 +45,7 @@ impl SeededHash {
 }
 
 struct HwC {
-    vec: Vec<LinkedList<u32>>,
+    vec: Vec<Vec<u32>>,
     hash_function: SeededHash
 }
 
@@ -48,116 +53,34 @@ impl HwC {
     fn new(size: usize) -> HwC {
         let input_len: usize = size;
         let hash_len: u32 = log2u(input_len);
-        let vec = vec![LinkedList::<u32>::new(); input_len];
+        let vec = vec![Vec::<u32>::new(); input_len];
         let hash_fn: SeededHash = SeededHash::new(hash_len);
         return HwC {
             vec,
             hash_function: hash_fn
         }
     }
-    fn insert(&mut self, elem: u32) {
-        let hash_val: usize = self.hash_function.hash(elem);
-        self.vec[hash_val].push_back(elem)
-    }
-    fn query(&self, elem: u32) -> bool {
-        let hash_val: usize = self.hash_function.hash(elem);
-        self.vec[hash_val].contains(&elem)
-    }
-}
+    fn insert(&mut self, key: u32, value: u32) {
+        let hash_val: usize = self.hash_function.hash(key);
 
-struct Bucket {
-    vec: Vec<u32>,
-    hash_function: SeededHash,
-}
-
-impl Bucket {
-    fn new(input_array: &Vec<u32>) -> Bucket {
-        let array_len: usize = 2*C*input_array.len().pow(2);
-        if array_len == 0 {
-            return Bucket {
-                vec: vec![0; 0],
-                hash_function: SeededHash::new(0)
+        for i in 0..self.vec[hash_val].len().step_by(2) {
+            if self.vec[hash_val][i] == key {
+                self.vec[hash_val][i+1] += value;
+                return;
             }
         }
-        let hash_len: u32 = log2u(array_len);
-        let arr = vec![0; array_len];
-        let mut bucket: Bucket = Bucket {
-            vec: arr,
-            hash_function: SeededHash::new(hash_len),
-        };
-        for x in input_array {
-            let success: bool = bucket.insert(*x);
-            if !success {
-                return Bucket::new(input_array)
+
+        self.vec[hash_val].push_back(key);
+        self.vec[hash_val].push_back(value)
+    }
+    fn get_norm(&self) -> u32 {
+        let mut sum: u32 = 0;
+        for vec in self.vec {
+            for i in 0..vec.len().step_by(2) {
+                sum += vec[i+1].pow(2);
             }
         }
-        return bucket;
-    }
-    fn insert(&mut self, elem: u32) -> bool {
-        return if self.vec[self.hash_function.hash(elem)] != 0 {
-            false
-        } else {
-            self.vec[self.hash_function.hash(elem)] = elem;
-            true
-        }
-    }
-    fn query(&self, elem: u32) -> bool {
-        return self.vec[self.hash_function.hash(elem)] == elem
-    }
-}
-
-struct PerfectHashing {
-    vec: Vec<Bucket>,
-    hash_function: SeededHash,
-}
-
-impl PerfectHashing {
-    fn new(input_array: &Vec<u32>) -> PerfectHashing {
-        let array_len: usize = 4*C*input_array.len();
-
-        let hash_len: u32 = log2u(array_len);
-        let hash_fn: SeededHash = SeededHash::new(hash_len);
-
-        let mut buckets: Vec<Vec<u32>> = Vec::new();
-        for _ in 0..array_len {
-            buckets.push(Vec::new());
-        }
-
-        for x in input_array {
-            let hash = hash_fn.hash(*x);
-            buckets[hash].push(*x);
-        }
-
-        let mut sum_of_squares = 0;
-        for x in &mut buckets {
-            sum_of_squares += x.len().pow(2);
-        }
-        if sum_of_squares > array_len {
-            println!("Fail");
-            return PerfectHashing::new(input_array);
-        }
-
-        let mut vec = Vec::<Bucket>::with_capacity(array_len);
-        for vec_bucket in &mut buckets {
-            if vec_bucket.len() == 0 {
-                vec.push(Bucket::new(&Vec::new()));
-                continue
-            }
-            let bucket = Bucket::new(vec_bucket);
-            vec.push(bucket);
-        }
-        return PerfectHashing {
-            vec,
-            hash_function: hash_fn
-        }
-    }
-    // fn insert(&mut self, elem: u32) {
-    //     let hash: usize = self.hash_function.hash(elem);
-    //     self.vec[hash].insert(elem);
-    // }
-    fn query(&self, elem: u32) -> bool {
-        let hash: usize = self.hash_function.hash(elem);
-        return self.vec[hash].query(elem);
+        return sum;
     }
 }
 
@@ -165,39 +88,11 @@ fn log2u(x: usize) -> u32 {
     x.ilog2()
 }
 
-fn make_rb_tree(input: &Vec<u32>) -> RBTree<u32, u32> {
-    let mut tree = RBTree::new();
-    for x in input {
-        tree.insert(*x, *x);
-    }
-    return tree;
-}
-
-fn rb_tree(input: &Vec<u32>, file: &mut File) {
-    let c_start = OffsetDateTime::now_utc();
-    let tree = make_rb_tree(input);
-    let c_stop = OffsetDateTime::now_utc();
-    writeln!(file, "Construction time: {}", c_stop - c_start).expect("Cannot write to file");
-
-    let mut sum: usize = 0;
-
-    let q_start = OffsetDateTime::now_utc();
-    for x in input {
-        if tree.contains_key(x) {
-            sum += 1;
-        }
-    }
-    let q_stop = OffsetDateTime::now_utc();
-    writeln!(file, "Query time: {}", q_stop - q_start).expect("Cannot write to file");
-
-    println!("{}", sum);
-}
-
-fn hashing_with_chaining(input: &Vec<u32>, file: &mut File) {
+fn hashing_with_chaining(input: &Vec<KeyValuePair>, file: &mut File) {
     let c_start = OffsetDateTime::now_utc();
     let mut hwc: HwC = HwC::new(input.len());
     for x in input {
-        hwc.insert(*x);
+        hwc.insert(x.key, x.value);
     }
     let c_stop = OffsetDateTime::now_utc();
     writeln!(file, "Construction time: {}", c_stop - c_start).expect("Cannot write to file");
@@ -205,11 +100,7 @@ fn hashing_with_chaining(input: &Vec<u32>, file: &mut File) {
 
     let mut sum: usize = 0;
     let q_start = OffsetDateTime::now_utc();
-    for x in input {
-        if hwc.query(*x) {
-            sum += 1;
-        }
-    }
+    let norm: u32 = hwc.get_norm();
     println!("{}", sum);
     let q_stop = OffsetDateTime::now_utc();
     writeln!(file, "Query time: {}", q_stop - q_start).expect("Cannot write to file");
@@ -223,23 +114,6 @@ fn hashing_with_chaining(input: &Vec<u32>, file: &mut File) {
     writeln!(file, "Longest linked list: {}", longest_ll).expect("Cannot write to file");
 }
 
-fn perfect_hashing(input: &Vec<u32>, file: &mut File) {
-    let c_start = OffsetDateTime::now_utc();
-    let ph_struct: PerfectHashing = PerfectHashing::new(&input);
-    let c_stop = OffsetDateTime::now_utc();
-    writeln!(file, "Construction time: {}", c_stop - c_start).expect("Cannot write to file");
-
-
-    let q_start = OffsetDateTime::now_utc();
-    let mut sum: usize = 0;
-    for x in input {
-        let s = ph_struct.query(*x) as usize;
-        sum = sum+s;
-    }
-    let q_stop = OffsetDateTime::now_utc();
-    writeln!(file, "Query time: {}", q_stop - q_start).expect("Cannot write to file");
-}
-
 fn make_writable_file(file_name: &str) -> File {
     return OpenOptions::new()
         .write(true)
@@ -248,44 +122,20 @@ fn make_writable_file(file_name: &str) -> File {
         .unwrap();
 }
 
-fn benchmark_rb_tree(test_sizes: [i32; 7]) {
-    let mut file: File = make_writable_file("rb_tree");
-
-    for test_size in test_sizes {
-        writeln!(file, "Test size: {}", test_size).expect("Cannot write to file");
-        let input_size: usize = 2_i32.pow(test_size as u32) as usize;
-        let input: Vec<u32> = Vec::from_iter(1..(input_size +1) as u32);
-        rb_tree(&input, &mut file);
-    }
-}
-
 fn benchmark_hwc(test_sizes: [i32; 7]) {
     let mut file: File = make_writable_file("hwc");
 
     for test_size in test_sizes {
         writeln!(file, "Test size: {}", test_size).expect("Cannot write to file");
-        let input_size: usize = 2_i32.pow(test_size as u32) as usize;
-        let input: Vec<u32> = Vec::from_iter(1..(input_size +1) as u32);
-        hashing_with_chaining(&input, &mut file);
-    }
-}
-
-fn benchmark_ph(test_sizes: [i32; 7]) {
-    let mut file: File = make_writable_file("ph");
-
-    for test_size in test_sizes {
-        writeln!(file, "Test size: {}", test_size).expect("Cannot write to file");
-        let input_size: usize = 2_i32.pow(test_size as u32) as usize;
-        let input: Vec<u32> = Vec::from_iter(1..(input_size +1) as u32);
-        perfect_hashing(&input, &mut file);
+        // let input_size: usize = 2_i32.pow(test_size as u32) as usize;
+        // let input: Vec<u32> = Vec::from_iter(1..(input_size +1) as u32);
+        // hashing_with_chaining(&input, &mut file);
     }
 }
 
 
 fn main() -> std::io::Result<()> {
     const TEST_SIZES: [i32; 7] = [12, 14, 16, 18, 20, 22, 24];
-    benchmark_rb_tree(TEST_SIZES);
     benchmark_hwc(TEST_SIZES);
-    benchmark_ph(TEST_SIZES);
     Ok(())
 }
