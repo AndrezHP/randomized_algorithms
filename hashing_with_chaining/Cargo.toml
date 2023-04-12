@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 rand = "0.8.5"
 rbtree = "0.1.5"
-criterion = "0.4.0"
+time = "0.3.20"
 
 [[bench]]
 name = "test"
