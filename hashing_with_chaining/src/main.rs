@@ -1,6 +1,4 @@
-use std::collections::LinkedList;
 use rand::prelude::*;
-use rbtree::RBTree;
 use time::OffsetDateTime;
 use std::fs::File;
 use std::fs::OpenOptions;
@@ -63,20 +61,20 @@ impl HwC {
     fn insert(&mut self, key: u32, value: u32) {
         let hash_val: usize = self.hash_function.hash(key);
 
-        for i in 0..self.vec[hash_val].len().step_by(2) {
+        for i in (0..self.vec[hash_val].len()).step_by(2) {
             if self.vec[hash_val][i] == key {
                 self.vec[hash_val][i+1] += value;
                 return;
             }
         }
 
-        self.vec[hash_val].push_back(key);
-        self.vec[hash_val].push_back(value)
+        self.vec[hash_val].push(key);
+        self.vec[hash_val].push(value)
     }
     fn get_norm(&self) -> u32 {
         let mut sum: u32 = 0;
-        for vec in self.vec {
-            for i in 0..vec.len().step_by(2) {
+        for vec in &self.vec {
+            for i in (0..vec.len()).step_by(2) {
                 sum += vec[i+1].pow(2);
             }
         }
@@ -88,31 +86,31 @@ fn log2u(x: usize) -> u32 {
     x.ilog2()
 }
 
-fn hashing_with_chaining(input: &Vec<KeyValuePair>, file: &mut File) {
-    let c_start = OffsetDateTime::now_utc();
-    let mut hwc: HwC = HwC::new(input.len());
-    for x in input {
-        hwc.insert(x.key, x.value);
-    }
-    let c_stop = OffsetDateTime::now_utc();
-    writeln!(file, "Construction time: {}", c_stop - c_start).expect("Cannot write to file");
-
-
-    let mut sum: usize = 0;
-    let q_start = OffsetDateTime::now_utc();
-    let norm: u32 = hwc.get_norm();
-    println!("{}", sum);
-    let q_stop = OffsetDateTime::now_utc();
-    writeln!(file, "Query time: {}", q_stop - q_start).expect("Cannot write to file");
-
-    let mut longest_ll: usize = 0;
-    for ll in hwc.vec {
-        if ll.len() > longest_ll {
-            longest_ll = ll.len();
-        }
-    }
-    writeln!(file, "Longest linked list: {}", longest_ll).expect("Cannot write to file");
-}
+// fn hashing_with_chaining(input: &Vec<KeyValuePair>, file: &mut File) {
+//     let c_start = OffsetDateTime::now_utc();
+//     let mut hwc: HwC = HwC::new(input.len());
+//     for x in input {
+//         hwc.insert(x.key, x.value);
+//     }
+//     let c_stop = OffsetDateTime::now_utc();
+//     writeln!(file, "Construction time: {}", c_stop - c_start).expect("Cannot write to file");
+//
+//
+//     // let mut sum: usize = 0;
+//     let q_start = OffsetDateTime::now_utc();
+//     let norm: u32 = hwc.get_norm();
+//     // println!("{}", sum);
+//     let q_stop = OffsetDateTime::now_utc();
+//     writeln!(file, "Query time: {}", q_stop - q_start).expect("Cannot write to file");
+//
+//     let mut longest_ll: usize = 0;
+//     for ll in hwc.vec {
+//         if ll.len() > longest_ll {
+//             longest_ll = ll.len();
+//         }
+//     }
+//     writeln!(file, "Longest linked list: {}", longest_ll).expect("Cannot write to file");
+// }
 
 fn make_writable_file(file_name: &str) -> File {
     return OpenOptions::new()
@@ -122,20 +120,30 @@ fn make_writable_file(file_name: &str) -> File {
         .unwrap();
 }
 
-fn benchmark_hwc(test_sizes: [i32; 7]) {
-    let mut file: File = make_writable_file("hwc");
+// fn benchmark_hwc(test_sizes: [i32; 7]) {
+//     let mut file: File = make_writable_file("hwc");
+//
+//     for test_size in test_sizes {
+//         writeln!(file, "Test size: {}", test_size).expect("Cannot write to file");
+//         // let input_size: usize = 2_i32.pow(test_size as u32) as usize;
+//         // let input: Vec<u32> = Vec::from_iter(1..(input_size +1) as u32);
+//         // hashing_with_chaining(&input, &mut file);
+//     }
+// }
 
-    for test_size in test_sizes {
-        writeln!(file, "Test size: {}", test_size).expect("Cannot write to file");
-        // let input_size: usize = 2_i32.pow(test_size as u32) as usize;
-        // let input: Vec<u32> = Vec::from_iter(1..(input_size +1) as u32);
-        // hashing_with_chaining(&input, &mut file);
-    }
+fn hwc_test() {
+    let mut hwc: HwC = HwC::new(1000);
+    hwc.insert(13, 25);
+    hwc.insert(13, 25);
+    hwc.insert(10, 2);
+    hwc.insert(17, 3);
+    println!("Norm: {}", hwc.get_norm())
 }
 
 
 fn main() -> std::io::Result<()> {
     const TEST_SIZES: [i32; 7] = [12, 14, 16, 18, 20, 22, 24];
-    benchmark_hwc(TEST_SIZES);
+    // benchmark_hwc(TEST_SIZES);
+    hwc_test();
     Ok(())
 }
