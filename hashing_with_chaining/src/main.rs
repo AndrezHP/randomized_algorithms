@@ -133,11 +133,20 @@ fn make_writable_file(file_name: &str) -> File {
 
 fn hwc_test() {
     let mut hwc: HwC = HwC::new(1000);
-    hwc.insert(13, 25);
-    hwc.insert(13, 25);
-    hwc.insert(10, 2);
-    hwc.insert(17, 3);
-    println!("Norm: {}", hwc.get_norm())
+    let vec: Vec<u32> = make_random_inputs(1000);
+    for i in (0..vec.len()).step_by(2) {
+        hwc.insert(vec[i], vec[i+1]);
+    }
+    println!("Norm: {}", hwc.get_norm());
+}
+
+fn make_random_inputs(input_size: usize) -> Vec<u32> {
+    let mut vec: Vec<u32> = Vec::new();
+    for _ in 0..input_size {
+        vec.push(random_generator(1, 1000));
+        vec.push(random_generator(1,1000));
+    }
+    return vec
 }
 
 
