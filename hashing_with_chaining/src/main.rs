@@ -191,44 +191,44 @@ fn test_hash() {
 
 fn exercise7hwc() {
     let number_of_updates = 10u64.pow(9);
-    let key_sizes = Vec::from_iter((6..28+1).step_by(2));
-    for key_size in key_sizes {
-        let updates = make_updates_of_1(number_of_updates, 2u64.pow(key_size));
-        let mut hwc = HwC::new(2usize.pow(key_size));
+    let key_sizes: Vec<u64> = Vec::from_iter((6..28+1).step_by(2));
+    for k in key_sizes {
+        let key_size = 2u64.pow(k as u32);
+        let mut hwc = HwC::new(key_size as usize);
 
         let i_start = OffsetDateTime::now_utc();
-        for i in (0..updates.len()).step_by(2) {
-            hwc.insert(updates[i], updates[i+1]);
+        for i in (0..number_of_updates).step_by(2) {
+            hwc.insert(i % key_size, 1);
         }
         let i_stop = OffsetDateTime::now_utc();
-        println!("HwC update with n = 2^{}: {}", key_size, i_stop - i_start);
+        println!("HwC update with n = 2^{}: {}", k, i_stop - i_start);
 
 
         let q_start = OffsetDateTime::now_utc();
         hwc.get_norm();
         let q_stop = OffsetDateTime::now_utc();
-        println!("HwC query with n = 2^{}: {}", key_size, q_stop - q_start);
+        println!("HwC query with n = 2^{}: {}", k, q_stop - q_start);
     }
 }
 
 fn exercise7norm_sketch() {
     let number_of_updates = 10u64.pow(9);
-    let key_sizes = Vec::from_iter((6..28+1).step_by(2));
-    for key_size in key_sizes {
-        let updates = make_updates_of_1(number_of_updates, 2u64.pow(key_size));
-        let mut norm_sketch = NormSketch::new(2usize.pow(20));
+    let key_sizes: Vec<u64> = Vec::from_iter((6..28+1).step_by(2));
+    for k in key_sizes {
+        let key_size = 2u64.pow(k as u32);
+        let mut norm_sketch = NormSketch::new(2usize.pow(7));
 
         let i_start = OffsetDateTime::now_utc();
-        for i in (0..updates.len()).step_by(2) {
-            norm_sketch.update(updates[i], updates[i + 1] as i64);
+        for i in (0..number_of_updates).step_by(2) {
+            norm_sketch.update(i % key_size, 1);
         }
         let i_stop = OffsetDateTime::now_utc();
-        println!("NormSketch update with n = 2^{}: {}", key_size, i_stop - i_start);
+        println!("NormSketch update with n = 2^{}: {}", k, i_stop - i_start);
 
         let q_start = OffsetDateTime::now_utc();
         norm_sketch.query();
         let q_stop = OffsetDateTime::now_utc();
-        println!("NormSketch query with n = 2^{}: {}", key_size, q_stop - q_start)
+        println!("NormSketch query with n = 2^{}: {}", k, q_stop - q_start)
     }
 }
 
