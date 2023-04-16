@@ -26,7 +26,10 @@ struct SeededHash {
 impl SeededHash {
     fn new(hash_len: u32) -> SeededHash {
         let randomness_size: u64 = 2u64.pow(63);
-        let rand_a: u64 = random_generator(1, randomness_size);
+        let mut rand_a: u64 = random_generator(1, randomness_size);
+        if rand_a % 2 == 0 {
+            rand_a += 1
+        }
         let rand_b: u64 = random_generator(0, randomness_size);
         return SeededHash {
             a: rand_a,
