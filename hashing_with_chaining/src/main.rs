@@ -3,7 +3,7 @@ use time::OffsetDateTime;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
-use std::ops::Shr;
+use std::ops::{Div, Shr};
 
 pub fn random_generator(from: u64, to: u64) -> u64 {
     let mut rng = thread_rng();
@@ -93,7 +93,7 @@ struct IndependentHash {
 
 impl IndependentHash {
     fn new(hash_len: u32) -> IndependentHash {
-        let randomness_size: u64 = 2u64.pow(31);
+        let randomness_size: u64 = 2u64.pow(63);
         return IndependentHash {
             a: random_generator(1, randomness_size),
             b: random_generator(1, randomness_size),
@@ -104,9 +104,10 @@ impl IndependentHash {
     }
     fn hash(&self, x: u64) -> (u64, i64) {
         let prime = 2u64.pow(31) - 1;
-        let mut k: u64 = (self.a * x + self.b) % prime;
-        k = (k * x + self.c) % prime;
-        k = (k * x + self.d) % prime;
+        let mut k: u64 = (self.a.wrapping_mul(x).wrapping_add(self.b)) % prime;
+        k = (k.wrapping_mul(x).wrapping_add(self.c)) % prime;
+        k = (k.wrapping_mul(x).wrapping_add(self.d)) % prime;
+        // let k = (self.a.wrapping_mul(x).wrapping_add(self.b)) >> 33;
 
         let h = k.shr(1) & (2u64.pow(self.l) - 1);
         // -> {-1, 1}
@@ -149,15 +150,6 @@ fn make_writable_file(file_name: &str) -> File {
         .unwrap();
 }
 
-fn hwc_test() {
-    let mut hwc: HwC = HwC::new(100000);
-    let vec: Vec<u64> = make_updates_of_1(100000, 100000);
-    for i in (0..vec.len()).step_by(2) {
-        hwc.insert(vec[i], vec[i+1]);
-    }
-    println!("Norm: {}", hwc.get_norm());
-}
-
 fn make_updates_of_1(input_size: u64, key_size: u64) -> Vec<u64> {
     let mut vec: Vec<u64> = Vec::new();
     for i in 0..input_size {
@@ -197,7 +189,7 @@ fn exercise7hwc() {
         let mut hwc = HwC::new(key_size as usize);
 
         let i_start = OffsetDateTime::now_utc();
-        for i in (0..number_of_updates).step_by(2) {
+        for i in 0..number_of_updates {
             hwc.insert(i % key_size, 1);
         }
         let i_stop = OffsetDateTime::now_utc();
@@ -219,7 +211,7 @@ fn exercise7norm_sketch() {
         let mut norm_sketch = NormSketch::new(2usize.pow(7));
 
         let i_start = OffsetDateTime::now_utc();
-        for i in (0..number_of_updates).step_by(2) {
+        for i in 0..number_of_updates {
             norm_sketch.update(i % key_size, 1);
         }
         let i_stop = OffsetDateTime::now_utc();
@@ -232,10 +224,39 @@ fn exercise7norm_sketch() {
     }
 }
 
+fn exercise8relative_error() {
+    let number_of_updates = 10u64.pow(3);
+
+    let mut real_norm: i64 = 0;
+    for i in 0..number_of_updates {
+        real_norm += (i.pow(2)).pow(2) as i64
+    }
+
+    for r in 3..20+1 {
+        let mut error_sum: f64 = 0.0;
+        let mut maximum_error: f64 = 0.0;
+        for _ in 0..1000 {
+            let mut norm_sketch = NormSketch::new(2usize.pow(r));
+            for i in 0..number_of_updates {
+                norm_sketch.update(i, i.pow(2) as i64);
+            }
+            let norm = norm_sketch.query();
+            let error = ((norm - real_norm).abs() as f64).div(real_norm as f64);
+            if error > maximum_error {
+                maximum_error = error
+            }
+            error_sum += error
+        }
+        let avg_error = error_sum.div(1000.0);
+        println!("Avg error with r = 2^{}: {}", r, avg_error);
+        println!("Maximum error with r = 2^{}: {}", r, maximum_error)
+    }
+}
+
 fn main() -> std::io::Result<()> {
     // test_hash();
-    // hwc_test();
-    exercise7hwc();
-    exercise7norm_sketch();
+    // exercise7hwc();
+    // exercise7norm_sketch();
+    exercise8relative_error();
     Ok(())
 }
