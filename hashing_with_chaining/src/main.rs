@@ -3,6 +3,7 @@ use time::OffsetDateTime;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
+use std::ops::Shr;
 
 pub fn random_generator(from: u64, to: u64) -> u64 {
     let mut rng = thread_rng();
@@ -11,11 +12,6 @@ pub fn random_generator(from: u64, to: u64) -> u64 {
 
 // The hash function is c-universal
 const C: usize = 2;
-
-struct KeyValuePair {
-    key: u64,
-    value: u64,
-}
 
 struct SeededHash {
     l: u32,
@@ -40,7 +36,7 @@ impl SeededHash {
     // Multiply shift hashing as from lecture notes (https://arxiv.org/pdf/1504.06804.pdf) at 3.3
     fn hash(&self, x: u64) -> usize {
         let multiply_add: u64 = self.a.wrapping_mul(x).wrapping_add(self.b);
-        return multiply_add.wrapping_shr(64 - self.l) as usize;
+        return multiply_add.shr(64 - self.l) as usize;
     }
 }
 
@@ -62,14 +58,12 @@ impl HwC {
     }
     fn insert(&mut self, key: u64, value: u64) {
         let hash_val: usize = self.hash_function.hash(key);
-
         for i in (0..self.vec[hash_val].len()).step_by(2) {
             if self.vec[hash_val][i] == key {
                 self.vec[hash_val][i+1] += value;
                 return;
             }
         }
-
         self.vec[hash_val].push(key);
         self.vec[hash_val].push(value)
     }
@@ -108,21 +102,16 @@ impl IndependentHash {
             l: hash_len
         }
     }
-    fn hash(&self, x: u64) -> u64 {
-        let mut k: u64 = (self.a * x + self.b).wrapping_shr(64 - self.l);
-        k = (k * x + self.c).wrapping_shr(64 - self.l);
-        k = (k * x + self.d).wrapping_shr(64 - self.l);
-        return k
-    }
-    // g: [n] -> {l}
-    fn h(&self, x: u64) -> u64 {
-        let k = self.hash(x);
-        return k.wrapping_shr(1) & (2u64.pow(self.l) - 1)
-    }
-    // g: [n] -> {-1, 1}
-    fn g(&self, x: u64) -> i64 {
-        let k: i64 = self.hash(x) as i64;
-        return 2*(k & 1) - 1;
+    fn hash(&self, x: u64) -> (u64, i64) {
+        let prime = 2u64.pow(31) - 1;
+        let mut k: u64 = (self.a * x + self.b) % prime;
+        k = (k * x + self.c) % prime;
+        k = (k * x + self.d) % prime;
+
+        let h = k.shr(1) & (2u64.pow(self.l) - 1);
+        // -> {-1, 1}
+        let g = 2*((k as i64) & 1) - 1;
+        return (h, g)
     }
 }
 
@@ -132,23 +121,23 @@ struct NormSketch {
 }
 
 impl NormSketch {
-    fn new(r: u32) -> NormSketch {
-        let hash = IndependentHash::new(r);
+    fn new(r: usize) -> NormSketch {
+        let hash = IndependentHash::new(log2u(r));
         return NormSketch {
-            vec: vec![0; r as usize],
+            vec: vec![0; r],
             hash_function: hash,
         }
     }
     fn update(&mut self, key: u64, value: i64) {
-        let h_hash = self.hash_function.h(key);
-        let g_hash = self.hash_function.g(key);
-        self.vec[h_hash as usize] += g_hash*value;
+        let (h, g) = self.hash_function.hash(key);
+        self.vec[h as usize] += g*value;
     }
-    fn query(&self) {
+    fn query(&self) -> i64 {
         let mut sum = 0;
         for x in &self.vec {
             sum += x.pow(2);
         }
+        return sum
     }
 }
 
@@ -162,18 +151,18 @@ fn make_writable_file(file_name: &str) -> File {
 
 fn hwc_test() {
     let mut hwc: HwC = HwC::new(100000);
-    let vec: Vec<u64> = make_random_inputs(100000);
+    let vec: Vec<u64> = make_updates_of_1(100000, 100000);
     for i in (0..vec.len()).step_by(2) {
         hwc.insert(vec[i], vec[i+1]);
     }
     println!("Norm: {}", hwc.get_norm());
 }
 
-fn make_random_inputs(input_size: usize) -> Vec<u64> {
+fn make_updates_of_1(input_size: u64, key_size: u64) -> Vec<u64> {
     let mut vec: Vec<u64> = Vec::new();
-    for _ in 0..input_size {
-        vec.push(random_generator(1, 2u64.pow(20)));
-        vec.push(random_generator(1,2u64.pow(20)));
+    for i in 0..input_size {
+        vec.push(i % key_size);
+        vec.push(1);
     }
     return vec
 }
@@ -192,20 +181,61 @@ fn test_hash() {
     let c_stop = OffsetDateTime::now_utc();
     println!("Old hash: {}", c_stop - c_start);
 
-
     let i_start = OffsetDateTime::now_utc();
     for x in &input {
-        independent_hash.h(*x);
-        independent_hash.g(*x);
+        independent_hash.hash(*x);
     }
     let i_stop = OffsetDateTime::now_utc();
     println!("4-wise independent hash: {}", i_stop - i_start)
 }
 
+fn exercise7hwc() {
+    let number_of_updates = 10u64.pow(9);
+    let key_sizes = Vec::from_iter((6..28+1).step_by(2));
+    for key_size in key_sizes {
+        let updates = make_updates_of_1(number_of_updates, 2u64.pow(key_size));
+        let mut hwc = HwC::new(2usize.pow(key_size));
+
+        let i_start = OffsetDateTime::now_utc();
+        for i in (0..updates.len()).step_by(2) {
+            hwc.insert(updates[i], updates[i+1]);
+        }
+        let i_stop = OffsetDateTime::now_utc();
+        println!("HwC update with n = 2^{}: {}", key_size, i_stop - i_start);
+
+
+        let q_start = OffsetDateTime::now_utc();
+        hwc.get_norm();
+        let q_stop = OffsetDateTime::now_utc();
+        println!("HwC query with n = 2^{}: {}", key_size, q_stop - q_start);
+    }
+}
+
+fn exercise7norm_sketch() {
+    let number_of_updates = 10u64.pow(9);
+    let key_sizes = Vec::from_iter((6..28+1).step_by(2));
+    for key_size in key_sizes {
+        let updates = make_updates_of_1(number_of_updates, 2u64.pow(key_size));
+        let mut norm_sketch = NormSketch::new(2usize.pow(20));
+
+        let i_start = OffsetDateTime::now_utc();
+        for i in (0..updates.len()).step_by(2) {
+            norm_sketch.update(updates[i], updates[i + 1] as i64);
+        }
+        let i_stop = OffsetDateTime::now_utc();
+        println!("NormSketch update with n = 2^{}: {}", key_size, i_stop - i_start);
+
+        let q_start = OffsetDateTime::now_utc();
+        norm_sketch.query();
+        let q_stop = OffsetDateTime::now_utc();
+        println!("NormSketch query with n = 2^{}: {}", key_size, q_stop - q_start)
+    }
+}
+
 fn main() -> std::io::Result<()> {
-    const TEST_SIZES: [i32; 7] = [12, 14, 16, 18, 20, 22, 24];
-    // benchmark_hwc(TEST_SIZES);
-    test_hash();
-    hwc_test();
+    // test_hash();
+    // hwc_test();
+    exercise7hwc();
+    exercise7norm_sketch();
     Ok(())
 }
