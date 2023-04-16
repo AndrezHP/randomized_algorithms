@@ -4,7 +4,7 @@ use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 
-pub fn random_generator(from: u32, to: u32) -> u32 {
+pub fn random_generator(from: u64, to: u64) -> u64 {
     let mut rng = thread_rng();
     return rng.gen_range(from..to);
 }
@@ -13,22 +13,21 @@ pub fn random_generator(from: u32, to: u32) -> u32 {
 const C: usize = 2;
 
 struct KeyValuePair {
-    key: u32,
-    value: u32,
+    key: u64,
+    value: u64,
 }
 
 struct SeededHash {
     l: u32,
-    a: u32,
-    b: u32,
+    a: u64,
+    b: u64,
 }
 
 impl SeededHash {
     fn new(hash_len: u32) -> SeededHash {
-        let base: u32 = 2;
-        let randomness_size: u32 = base.pow(31);
-        let rand_a: u32 = random_generator(1, randomness_size);
-        let rand_b: u32 = random_generator(1, randomness_size);
+        let randomness_size: u64 = 2u64.pow(63);
+        let rand_a: u64 = random_generator(1, randomness_size);
+        let rand_b: u64 = random_generator(0, randomness_size);
         return SeededHash {
             a: rand_a,
             b: rand_b,
@@ -36,14 +35,14 @@ impl SeededHash {
         }
     }
     // Multiply shift hashing as from lecture notes (https://arxiv.org/pdf/1504.06804.pdf) at 3.3
-    fn hash(&self, x: u32) -> usize {
-        let multiply_add: u32 = self.a.wrapping_mul(x).wrapping_add(self.b);
-        return multiply_add.wrapping_shr(32 - self.l) as usize;
+    fn hash(&self, x: u64) -> usize {
+        let multiply_add: u64 = self.a.wrapping_mul(x).wrapping_add(self.b);
+        return multiply_add.wrapping_shr(64 - self.l) as usize;
     }
 }
 
 struct HwC {
-    vec: Vec<Vec<u32>>,
+    vec: Vec<Vec<u64>>,
     hash_function: SeededHash
 }
 
@@ -51,14 +50,14 @@ impl HwC {
     fn new(size: usize) -> HwC {
         let input_len: usize = size;
         let hash_len: u32 = log2u(input_len);
-        let vec = vec![Vec::<u32>::new(); input_len];
+        let vec = vec![Vec::<u64>::new(); input_len];
         let hash_fn: SeededHash = SeededHash::new(hash_len);
         return HwC {
             vec,
             hash_function: hash_fn
         }
     }
-    fn insert(&mut self, key: u32, value: u32) {
+    fn insert(&mut self, key: u64, value: u64) {
         let hash_val: usize = self.hash_function.hash(key);
 
         for i in (0..self.vec[hash_val].len()).step_by(2) {
@@ -71,8 +70,8 @@ impl HwC {
         self.vec[hash_val].push(key);
         self.vec[hash_val].push(value)
     }
-    fn get_norm(&self) -> u32 {
-        let mut sum: u32 = 0;
+    fn get_norm(&self) -> u64 {
+        let mut sum: u64 = 0;
         for vec in &self.vec {
             for i in (0..vec.len()).step_by(2) {
                 sum += vec[i+1].pow(2);
@@ -98,7 +97,7 @@ fn log2u(x: usize) -> u32 {
 //
 //     // let mut sum: usize = 0;
 //     let q_start = OffsetDateTime::now_utc();
-//     let norm: u32 = hwc.get_norm();
+//     let norm: u64 = hwc.get_norm();
 //     // println!("{}", sum);
 //     let q_stop = OffsetDateTime::now_utc();
 //     writeln!(file, "Query time: {}", q_stop - q_start).expect("Cannot write to file");
@@ -125,26 +124,26 @@ fn make_writable_file(file_name: &str) -> File {
 //
 //     for test_size in test_sizes {
 //         writeln!(file, "Test size: {}", test_size).expect("Cannot write to file");
-//         // let input_size: usize = 2_i32.pow(test_size as u32) as usize;
-//         // let input: Vec<u32> = Vec::from_iter(1..(input_size +1) as u32);
+//         // let input_size: usize = 2_i32.pow(test_size as u64) as usize;
+//         // let input: Vec<u64> = Vec::from_iter(1..(input_size +1) as u64);
 //         // hashing_with_chaining(&input, &mut file);
 //     }
 // }
 
 fn hwc_test() {
-    let mut hwc: HwC = HwC::new(1000);
-    let vec: Vec<u32> = make_random_inputs(1000);
+    let mut hwc: HwC = HwC::new(100000);
+    let vec: Vec<u64> = make_random_inputs(100000);
     for i in (0..vec.len()).step_by(2) {
         hwc.insert(vec[i], vec[i+1]);
     }
     println!("Norm: {}", hwc.get_norm());
 }
 
-fn make_random_inputs(input_size: usize) -> Vec<u32> {
-    let mut vec: Vec<u32> = Vec::new();
+fn make_random_inputs(input_size: usize) -> Vec<u64> {
+    let mut vec: Vec<u64> = Vec::new();
     for _ in 0..input_size {
-        vec.push(random_generator(1, 1000));
-        vec.push(random_generator(1,1000));
+        vec.push(random_generator(1, 2u64.pow(20)));
+        vec.push(random_generator(1,2u64.pow(20)));
     }
     return vec
 }
