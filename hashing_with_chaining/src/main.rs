@@ -3,6 +3,7 @@ use time::OffsetDateTime;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
+use std::ops::Shr;
 
 pub fn random_generator(from: u64, to: u64) -> u64 {
     let mut rng = thread_rng();
@@ -88,31 +89,44 @@ fn log2u(x: usize) -> u32 {
     x.ilog2()
 }
 
-// fn hashing_with_chaining(input: &Vec<KeyValuePair>, file: &mut File) {
-//     let c_start = OffsetDateTime::now_utc();
-//     let mut hwc: HwC = HwC::new(input.len());
-//     for x in input {
-//         hwc.insert(x.key, x.value);
-//     }
-//     let c_stop = OffsetDateTime::now_utc();
-//     writeln!(file, "Construction time: {}", c_stop - c_start).expect("Cannot write to file");
-//
-//
-//     // let mut sum: usize = 0;
-//     let q_start = OffsetDateTime::now_utc();
-//     let norm: u64 = hwc.get_norm();
-//     // println!("{}", sum);
-//     let q_stop = OffsetDateTime::now_utc();
-//     writeln!(file, "Query time: {}", q_stop - q_start).expect("Cannot write to file");
-//
-//     let mut longest_ll: usize = 0;
-//     for ll in hwc.vec {
-//         if ll.len() > longest_ll {
-//             longest_ll = ll.len();
-//         }
-//     }
-//     writeln!(file, "Longest linked list: {}", longest_ll).expect("Cannot write to file");
-// }
+// 4-wise independent hash function
+struct IndependentHash {
+    a: u64,
+    b: u64,
+    c: u64,
+    d: u64,
+    l: u32,
+}
+
+impl IndependentHash {
+    fn new(hash_len: u32) -> IndependentHash {
+        let base: u64 = 2;
+        let randomness_size: u64 = base.pow(31);
+        return IndependentHash {
+            a: random_generator(1, randomness_size),
+            b: random_generator(1, randomness_size),
+            c: random_generator(1, randomness_size),
+            d: random_generator(1, randomness_size),
+            l: hash_len
+        }
+    }
+    fn hash(&self, x: u64) -> u64 {
+        let mut k: u64 = (self.a * x + self.b).wrapping_shr(64 - self.l);
+        k = (k * x + self.c).wrapping_shr(64 - self.l);
+        k = (k * x + self.d).wrapping_shr(64 - self.l);
+        return k
+    }
+    // g: [n] -> {l}
+    fn h(&self, x: u64) -> u64 {
+        let k = self.hash(x);
+        return k.wrapping_shr(1) & (2u64.pow(self.l) - 1)
+    }
+    // g: [n] -> {-1, 1}
+    fn g(&self, x: u64) -> i64 {
+        let k: i64 = self.hash(x) as i64;
+        return 2*(k & 1) - 1;
+    }
+}
 
 fn make_writable_file(file_name: &str) -> File {
     return OpenOptions::new()
@@ -121,17 +135,6 @@ fn make_writable_file(file_name: &str) -> File {
         .open(file_name.to_owned() + ".txt")
         .unwrap();
 }
-
-// fn benchmark_hwc(test_sizes: [i32; 7]) {
-//     let mut file: File = make_writable_file("hwc");
-//
-//     for test_size in test_sizes {
-//         writeln!(file, "Test size: {}", test_size).expect("Cannot write to file");
-//         // let input_size: usize = 2_i32.pow(test_size as u64) as usize;
-//         // let input: Vec<u64> = Vec::from_iter(1..(input_size +1) as u64);
-//         // hashing_with_chaining(&input, &mut file);
-//     }
-// }
 
 fn hwc_test() {
     let mut hwc: HwC = HwC::new(100000);
@@ -151,10 +154,34 @@ fn make_random_inputs(input_size: usize) -> Vec<u64> {
     return vec
 }
 
+fn test_hash() {
+    let input_size = 10usize.pow(6);
+    let input: Vec<u64> = Vec::from_iter(0..input_size as u64);
+
+    let hash = SeededHash::new(log2u(input_size));
+    let independent_hash = IndependentHash::new(log2u(input_size));
+
+    let c_start = OffsetDateTime::now_utc();
+    for x in &input {
+        hash.hash(*x);
+    }
+    let c_stop = OffsetDateTime::now_utc();
+    println!("Old hash: {}", c_stop - c_start);
+
+
+    let i_start = OffsetDateTime::now_utc();
+    for x in &input {
+        independent_hash.h(*x);
+        independent_hash.g(*x);
+    }
+    let i_stop = OffsetDateTime::now_utc();
+    println!("4-wise independent hash: {}", i_stop - i_start)
+}
 
 fn main() -> std::io::Result<()> {
     const TEST_SIZES: [i32; 7] = [12, 14, 16, 18, 20, 22, 24];
     // benchmark_hwc(TEST_SIZES);
+    test_hash();
     hwc_test();
     Ok(())
 }
