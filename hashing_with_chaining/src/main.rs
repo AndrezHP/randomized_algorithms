@@ -3,7 +3,6 @@ use time::OffsetDateTime;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
-use std::ops::Shr;
 
 pub fn random_generator(from: u64, to: u64) -> u64 {
     let mut rng = thread_rng();
@@ -100,8 +99,7 @@ struct IndependentHash {
 
 impl IndependentHash {
     fn new(hash_len: u32) -> IndependentHash {
-        let base: u64 = 2;
-        let randomness_size: u64 = base.pow(31);
+        let randomness_size: u64 = 2u64.pow(31);
         return IndependentHash {
             a: random_generator(1, randomness_size),
             b: random_generator(1, randomness_size),
@@ -125,6 +123,32 @@ impl IndependentHash {
     fn g(&self, x: u64) -> i64 {
         let k: i64 = self.hash(x) as i64;
         return 2*(k & 1) - 1;
+    }
+}
+
+struct NormSketch {
+    vec: Vec<i64>,
+    hash_function: IndependentHash,
+}
+
+impl NormSketch {
+    fn new(r: u32) -> NormSketch {
+        let hash = IndependentHash::new(r);
+        return NormSketch {
+            vec: vec![0; r as usize],
+            hash_function: hash,
+        }
+    }
+    fn update(&mut self, key: u64, value: i64) {
+        let h_hash = self.hash_function.h(key);
+        let g_hash = self.hash_function.g(key);
+        self.vec[h_hash as usize] += g_hash*value;
+    }
+    fn query(&self) {
+        let mut sum = 0;
+        for x in &self.vec {
+            sum += x.pow(2);
+        }
     }
 }
 
